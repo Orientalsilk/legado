@@ -16,9 +16,10 @@ class SpeechRoleTaggerTest {
     }
 
     @Test
-    fun tagsHaveSameLengthAndAreSurrogatePairs() {
+    fun tagsHaveSameLengthAndAreInvisible() {
         assertEquals(m.length, f.length)
-        assertEquals(4, m.length)
+        assertEquals(3, m.length)
+        assertTrue((m + f).none { it.isLetterOrDigit() })
     }
 
     @Test

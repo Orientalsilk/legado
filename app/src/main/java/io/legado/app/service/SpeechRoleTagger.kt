@@ -3,7 +3,7 @@ package io.legado.app.service
 /**
  * 多角色朗读标记（仅系统 TTS 使用）。
  *
- * 判断每句对话是男声还是女声，并在这句对话的开头插入一个表情符号标记，
+ * 判断每句对话是男声还是女声，并在这句对话的开头插入一个不可见的标记，
  * 让支持“按标记选声音”的 TTS 引擎（如 MultiTTS）切换声音。
  * 旁白不加标记；判断不出来的对话也不加标记，保持引擎默认声音。
  */
@@ -47,11 +47,11 @@ internal class TaggedSpeech(
 
 internal object SpeechRoleTagger {
 
-    /** 🧑🏻 */
-    const val MALE_TAG = "🧑🏻"
+    /** 男声标记：不可见、不会被朗读（U+2060 U+200C U+2060） */
+    const val MALE_TAG = "\u2060\u200C\u2060"
 
-    /** 👩🏻 */
-    const val FEMALE_TAG = "👩🏻"
+    /** 女声标记：不可见、不会被朗读（U+2060 U+200D U+2060） */
+    const val FEMALE_TAG = "\u2060\u200D\u2060"
 
     private val openToClose = mapOf('“' to '”', '「' to '」', '『' to '』', '"' to '"')
 
