@@ -1,4 +1,4 @@
-name: Release Build
+name: Personal Build
 
 on:
 #  push:
@@ -31,7 +31,7 @@ jobs:
     needs: prepare
     if: ${{ needs.prepare.outputs.sign }}
     permissions:
-      contents: write
+      contents: read
     strategy:
       matrix:
         product: [ app ]
@@ -40,7 +40,6 @@ jobs:
     env:
       product: ${{ matrix.product }}
       VERSION: ${{ needs.prepare.outputs.version }}
-      play: ${{ needs.prepare.outputs.play }}
     steps:
       - uses: actions/checkout@v7
         with:
