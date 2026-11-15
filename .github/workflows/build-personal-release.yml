@@ -1,0 +1,60 @@
+name: Build Personal Release APK
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Setup JDK 21
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v6.4.0
+
+      - name: Prepare Assets
+        run: echo "" > "$GITHUB_WORKSPACE/app/src/main/assets/18PlusList.txt"
+
+      - name: Configure signing
+        env:
+          KEYSTORE_B64: ${{ secrets.PERSONAL_KEYSTORE_B64 }}
+        run: |
+          if [ -n "$KEYSTORE_B64" ]; then
+            echo "$KEYSTORE_B64" | base64 --decode > "$GITHUB_WORKSPACE/app/personal.jks"
+            echo "Using the personal keystore from repository secrets."
+          else
+            echo "::warning::PERSONAL_KEYSTORE_B64 is not set. Using a temporary key: this APK installs, but cannot update over an APK signed with a different key."
+            keytool -genkeypair -keystore "$GITHUB_WORKSPACE/app/personal.jks" -alias legado \
+              -keyalg RSA -keysize 2048 -validity 36500 \
+              -storepass legado-personal -keypass legado-personal -dname "CN=Legado Temporary"
+          fi
+          {
+            echo "RELEASE_STORE_FILE=./personal.jks"
+            echo "RELEASE_STORE_PASSWORD=legado-personal"
+            echo "RELEASE_KEY_ALIAS=legado"
+            echo "RELEASE_KEY_PASSWORD=legado-personal"
+          } >> "$GITHUB_WORKSPACE/gradle.properties"
+
+      - name: Build release APK
+        run: |
+          chmod +x gradlew
+          ./gradlew :app:assembleAppRelease -ParmOnly=true --build-cache --warning-mode all
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: legado-release-apk
+          path: app/build/outputs/apk/app/release/*.apk
+          if-no-files-found: error

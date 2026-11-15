@@ -141,7 +141,7 @@ class FileAssociationViewModel(application: Application, private val savedState:
     private suspend fun dispatchFile(fileDoc: FileDoc, shared: Boolean = false) {
         // ACTION_VIEW on a book already inside the configured library must not stage
         // and copy it back into the same directory (which creates a "(1)" duplicate).
-        if (!shared && fileDoc.name.matches(bookFileRegex)) {
+        if (!shared && bookFileRegex.matches(fileDoc.name)) {
             val bookDirectory = AppConfig.defaultBookTreeUri?.let(Uri::parse)
             if (bookDirectory != null && isSameLocalBookFile(fileDoc, bookDirectory)) {
                 openBookLiveData.postValue(LocalBook.importFile(fileDoc.uri))
