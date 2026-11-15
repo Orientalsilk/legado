@@ -1107,7 +1107,7 @@
     <string name="keep_group">Giữ nhóm</string>
     <string name="server_config">Cấu hình máy chủ</string>
     <string name="sure_upload">URL webDav từ xa đã tồn tại, tiếp tục?</string>
-    <string name="unsupport_archivefile_entry">Không thể tìm thấy các tệp được hỗ trợ trong kho lưu trữ</string>
+    <string name="unsupport_archivefile_entry">Không tìm thấy tệp được hỗ trợ</string>
     <string name="no_books_dir">Không có vị trí lưu sách nào được đặt!</string>
     <string name="delete_alert">Xóa cảnh báo</string>
     <string name="no_book_found_bookshelf">Không tìm thấy sách trong tủ sách, nhập lại?</string>
