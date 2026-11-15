@@ -1,0 +1,56 @@
+name: Build Debug APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - 'feature/**'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup JDK 21
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v6.4.0
+
+      - name: Prepare Assets
+        run: echo "" > "$GITHUB_WORKSPACE/app/src/main/assets/18PlusList.txt"
+
+      - name: Unit test (multi-role tagger)
+        continue-on-error: true
+        run: |
+          chmod +x gradlew
+          ./gradlew :app:testAppDebugUnitTest --tests 'io.legado.app.service.SpeechRoleTaggerTest' \
+            --build-cache --warning-mode all
+
+      - name: Build debug APK
+        run: |
+          chmod +x gradlew
+          ./gradlew :app:assembleAppDebug -ParmOnly=true --build-cache --warning-mode all
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: legado-debug-apk
+          path: app/build/outputs/apk/app/debug/*.apk
+          if-no-files-found: error
+
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-report
+          path: app/build/reports/tests/
+          if-no-files-found: ignore
