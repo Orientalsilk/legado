@@ -1114,7 +1114,7 @@
     <string name="keep_group">保留分组</string>
     <string name="server_config">服务器配置</string>
     <string name="sure_upload">Remote webDav url exists, Continue?</string>
-    <string name="unsupport_archivefile_entry">Cannot find supported files in archive</string>
+    <string name="unsupport_archivefile_entry">対応ファイルが見つかりません</string>
     <string name="no_books_dir">没有设置书籍保存位置!</string>
     <string name="delete_alert">删除提醒</string>
     <string name="no_book_found_bookshelf">No book found in bookshelf, import again ?</string>
