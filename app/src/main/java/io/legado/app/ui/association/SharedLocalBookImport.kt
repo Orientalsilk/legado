@@ -31,7 +31,7 @@ internal fun isSameLocalBookFile(file: FileDoc, directory: Uri): Boolean {
 
 internal fun isSameLocalBookPath(source: File, directory: File): Boolean =
     runCatching {
-        source.isFile && source.canonicalFile.parentFile == directory.canonicalFile
+        source.isFile && source.canonicalFile.toPath().startsWith(directory.canonicalFile.toPath())
     }.getOrDefault(false)
 
 /** Own the complete input batch before showing a preview or opening a reader. */
