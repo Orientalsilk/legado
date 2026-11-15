@@ -53,9 +53,12 @@ class SharedImportAssociationTest {
         try {
             val library = File(root, "books").apply { mkdirs() }
             val source = File(library, "novel.txt").apply { writeText("chapter") }
+            val nestedDirectory = File(library, "series").apply { mkdirs() }
+            val nestedSource = File(nestedDirectory, "volume.txt").apply { writeText("chapter") }
             val otherDirectory = File(root, "other").apply { mkdirs() }
 
             assertTrue(isSameLocalBookPath(source, library))
+            assertTrue(isSameLocalBookPath(nestedSource, library))
             assertFalse(isSameLocalBookPath(source, otherDirectory))
             assertFalse(isSameLocalBookPath(library, library))
         } finally {
