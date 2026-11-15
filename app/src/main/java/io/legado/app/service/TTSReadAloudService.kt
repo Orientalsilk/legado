@@ -93,6 +93,7 @@ class TTSReadAloudService : BaseReadAloudService() {
     fun clearTTS() {
         ttsInitGeneration++
         playbackSessionId.incrementAndGet()
+        utteranceTags.clear()
         textToSpeech?.runCatching {
             stop()
             shutdown()
