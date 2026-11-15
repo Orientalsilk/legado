@@ -164,10 +164,11 @@ class FontSelectDialog : BaseDialogFragment(R.layout.dialog_font_select),
 
     private fun isValidFont(file: File): Boolean = kotlin.runCatching {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            Typeface.Builder(file).build() != null
+            Typeface.Builder(file).build()
         } else {
-            Typeface.createFromFile(file) != Typeface.DEFAULT
+            Typeface.createFromFile(file)
         }
+        true
     }.getOrDefault(false)
 
     private fun openFolder() {
