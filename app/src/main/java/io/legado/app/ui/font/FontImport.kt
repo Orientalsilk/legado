@@ -4,7 +4,10 @@ import java.io.File
 import java.io.IOException
 import java.io.InputStream
 
-private val fontFileNameRegex = Regex("(?i)^.+\\.(?:ttf|otf)$")
+private val fontFileNameRegex = Regex("(?i)^.+\\.(?:ttf|otf|ttc|otc)$")
+
+internal fun isSupportedFontFileName(name: String): Boolean =
+    fontFileNameRegex.matches(name.replace('\\', '/').substringAfterLast('/').trim())
 
 @Synchronized
 internal fun installFontFile(
@@ -17,7 +20,7 @@ internal fun installFontFile(
         .replace('\\', '/')
         .substringAfterLast('/')
         .trim()
-    require(fontFileNameRegex.matches(fileName)) { "invalid font file name" }
+    require(isSupportedFontFileName(fileName)) { "invalid font file name" }
     if ((!directory.exists() && !directory.mkdirs()) || !directory.isDirectory) {
         throw IOException("unable to create font directory")
     }
