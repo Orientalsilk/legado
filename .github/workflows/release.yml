@@ -14,22 +14,30 @@ jobs:
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
     outputs:
       version: ${{ steps.set-ver.outputs.version }}
-      sign: ${{ steps.check.outputs.sign }}
     steps:
       - id: set-ver
         run: |
           echo "version=$(date -d "8 hour" -u +3.%y.%m%d%H)" >> $GITHUB_OUTPUT
-      - id: check
+      - name: Verify existing signing secrets
         env:
           RELEASE_KEY_STORE: ${{ secrets.RELEASE_KEY_STORE }}
+          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+          RELEASE_STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
         run: |
-          if [ -n "$RELEASE_KEY_STORE" ]; then
-            echo "sign=yes" >> "$GITHUB_OUTPUT"
+          missing=()
+          for name in RELEASE_KEY_STORE RELEASE_KEY_ALIAS RELEASE_KEY_PASSWORD RELEASE_STORE_PASSWORD; do
+            if [ -z "${!name}" ]; then
+              missing+=("$name")
+            fi
+          done
+          if [ "${#missing[@]}" -gt 0 ]; then
+            printf 'Missing required repository Actions secrets: %s\n' "${missing[*]}" >&2
+            exit 1
           fi
 
   build:
     needs: prepare
-    if: ${{ needs.prepare.outputs.sign }}
     permissions:
       contents: read
     strategy:
@@ -112,4 +120,6 @@ jobs:
         with:
           name: legado_${{ env.product }}
           path: ${{ github.workspace }}/apk/*.apk
+          if-no-files-found: error
+          retention-days: 14
 
