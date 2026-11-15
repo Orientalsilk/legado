@@ -209,6 +209,7 @@ class HttpReadAloudService : BaseReadAloudService(),
         val sessionId: Long,
         val paragraphSession: Long,
         val stream: Boolean,
+        val roleTagState: RoleTagState,
         val variable: String,
         val loginHeader: String,
     )
@@ -314,13 +315,16 @@ class HttpReadAloudService : BaseReadAloudService(),
     private fun downloadAndPlayParagraphAudios(stream: Boolean) {
         val chapter = textChapter ?: return
         val httpTts = ReadAloud.httpTTS?.copy() ?: return
-        val request = ParagraphAudioRequest(
-            chapter, httpTts, speechRate, startPlaybackSession(), paragraphSession, stream,
-            httpTts.getVariable(), httpTts.getLoginHeader().orEmpty(),
-        )
+        val roleTagState = RoleTagState()
         val speechItems = paragraphSpeechItems
         val firstIndex = nowSpeak
-        val roleTagState = RoleTagState()
+        speechItems.take(firstIndex).forEach { prior ->
+            if (AppConfig.ttsRoleTag) SpeechRoleTagger.tag(prior.text, roleTagState)
+        }
+        val request = ParagraphAudioRequest(
+            chapter, httpTts, speechRate, startPlaybackSession(), paragraphSession, stream,
+            roleTagState, httpTts.getVariable(), httpTts.getLoginHeader().orEmpty(),
+        )
         downloadTask = execute {
             downloadTaskActiveLock.withLock {
                 checkParagraphRequest(request)
@@ -483,7 +487,12 @@ class HttpReadAloudService : BaseReadAloudService(),
                     val name = paragraphCacheName(speech.text, target, request)
                     if (request.stream) {
                         val downloader = createDownloader(
-                            createParagraphDataSourceFactory(request, speech.text, prefetch = true), name,
+                            createParagraphDataSourceFactory(
+                                request, speech.text,
+                                if (AppConfig.ttsRoleTag) SpeechRoleTagger.tag(speech.text, request.roleTagState).text
+                                else speech.text,
+                                prefetch = true,
+                            ), name,
                         )
                         prefetchDownloader.set(downloader)
                         try {
@@ -496,7 +505,11 @@ class HttpReadAloudService : BaseReadAloudService(),
                         val input = getSpeakStream(
                             request.httpTts, speech.text, request.sessionId,
                             prefetch = true, requestRate = request.rate,
-                            roleTaggedText = SpeechRoleTagger.tag(speech.text, RoleTagState()).text,
+                            roleTaggedText = if (AppConfig.ttsRoleTag) {
+                                SpeechRoleTagger.tag(speech.text, request.roleTagState).text
+                            } else {
+                                speech.text
+                            },
                         ) ?: continue
                         writeParagraphAudio(name, input, request)
                     }
@@ -587,21 +600,22 @@ class HttpReadAloudService : BaseReadAloudService(),
                     enqueueMediaItems(sessionId, listOfNotNull(mediaItem, pauseItem))
                 }
                 ensureSessionActive(sessionId)
-                preDownloadAudios(httpTts, sessionId)
+                preDownloadAudios(httpTts, sessionId, roleTagState)
             }
         }.onError {
             AppLog.put("朗读下载出错\n${it.localizedMessage}", it, true)
         }
     }
 
-    private suspend fun preDownloadAudios(httpTts: HttpTTS, sessionId: Long) {
+    private suspend fun preDownloadAudios(
+        httpTts: HttpTTS, sessionId: Long, roleTagState: RoleTagState,
+    ) {
         val textChapter = ReadBook.nextTextChapter ?: return
         val contentList = textChapter.getNeedReadAloud(0, readAloudByPage, 0, 1)
             .splitToSequence("\n")
             .filter { it.isNotEmpty() }
             .take(NEXT_CHAPTER_TTS_PREFETCH_ITEM_LIMIT)
             .toList()
-        val roleTagState = RoleTagState()
         contentList.forEach { content ->
             currentCoroutineContext().ensureActive()
             val fileName = md5SpeakFileName(content, textChapter)
@@ -703,7 +717,7 @@ class HttpReadAloudService : BaseReadAloudService(),
                         )
                     }
                     ensureSessionActive(sessionId)
-                    preDownloadAudiosStream(httpTts, downloaderChannel, sessionId)
+                    preDownloadAudiosStream(httpTts, downloaderChannel, sessionId, roleTagState)
                 } finally {
                     downloaderChannel.close()
                 }
@@ -716,7 +730,8 @@ class HttpReadAloudService : BaseReadAloudService(),
     private suspend fun preDownloadAudiosStream(
         httpTts: HttpTTS,
         downloaderChannel: Channel<Downloader>,
-        sessionId: Long
+        sessionId: Long,
+        roleTagState: RoleTagState,
     ) {
         val textChapter = ReadBook.nextTextChapter ?: return
         val contentList = textChapter.getNeedReadAloud(0, readAloudByPage, 0, 1)
