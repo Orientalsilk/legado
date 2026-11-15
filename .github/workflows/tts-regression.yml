@@ -36,7 +36,6 @@ jobs:
         run: echo "" > "$GITHUB_WORKSPACE/app/src/main/assets/18PlusList.txt"
 
       - name: Run TTS regression tests
-        continue-on-error: true
         run: |
           chmod +x gradlew
           ./gradlew :app:testAppDebugUnitTest \
@@ -48,17 +47,6 @@ jobs:
             --tests 'io.legado.app.ui.font.FontImportTest' \
             --tests 'io.legado.app.model.webBook.BookChapterUrlChangeTest' \
             --build-cache --warning-mode all
-
-      - name: Build debug APK
-        run: |
-          ./gradlew :app:assembleAppDebug -ParmOnly=true --build-cache --warning-mode all
-
-      - name: Upload debug APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: legado-tts-debug-apk
-          path: app/build/outputs/apk/app/debug/*.apk
-          if-no-files-found: error
 
       - name: Upload test report
         if: always()
