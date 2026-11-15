@@ -136,7 +136,7 @@ internal fun generateSilentWavBytes(durationMs: Int): ByteArray {
 }
 
 /** 开启多角色标记后音频内容不同，缓存要和未开启时分开。 */
-private fun roleTagCacheKey(): String = if (AppConfig.ttsRoleTag) "#roletag1" else ""
+private fun roleTagCacheKey(): String = if (AppConfig.ttsRoleTag) "#roletag2" else ""
 
 internal fun buildHttpTtsCacheFileName(
     chapterTitle: String,
