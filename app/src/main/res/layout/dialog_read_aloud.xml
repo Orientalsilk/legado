@@ -199,6 +199,30 @@
         android:orientation="vertical">
 
         <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_vertical"
+            android:orientation="horizontal"
+            android:padding="8dp">
+
+            <Space
+                android:layout_width="0dp"
+                android:layout_height="1dp"
+                android:layout_gravity="center"
+                android:layout_weight="1" />
+
+            <io.legado.app.lib.theme.view.ThemeSwitch
+                android:id="@+id/cb_tts_role_tag"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_vertical"
+                android:contentDescription="@string/tts_role_tag"
+                android:text="@string/tts_role_tag"
+                tools:ignore="RtlHardcoded,TouchTargetSizeCheck" />
+
+        </LinearLayout>
+
+        <LinearLayout
             android:id="@+id/ll_tts_SpeechRate"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
