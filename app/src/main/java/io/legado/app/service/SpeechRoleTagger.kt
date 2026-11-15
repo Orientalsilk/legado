@@ -130,7 +130,7 @@ internal object SpeechRoleTagger {
     }
 
     private fun parseNames(line: String): List<String> =
-        line.split(Regex("[|,，、;；\\s]+")).map { it.trim() }.filter { it.length >= 2 }
+        line.split(Regex("[|,，、;；\\s]+")).map { it.trim() }.filter { it.length >= 2 || it == "我" }
 
     @Synchronized
     private fun currentMatcher(): Matcher {

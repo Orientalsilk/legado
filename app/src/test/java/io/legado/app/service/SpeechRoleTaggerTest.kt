@@ -70,6 +70,25 @@ class SpeechRoleTaggerTest {
     }
 
     @Test
+    fun firstPersonLeadIsRecognisedWhenConfiguredAsWo() {
+        SpeechRoleTagger.leadNamesProvider = { "我、叶默" }
+        try {
+            val out = run(
+                "我笑了笑，说道：“走吧。”",
+                "他看着我，冷冷地说：“你来晚了。”",
+                "我看着他，他说：“坐。”"
+            )
+            assertEquals("我笑了笑，说道：${SpeechRoleTagger.MALE_LEAD_TAG}“走吧。”", out[0])
+            // “看着我”里的我是被看的人，说话的是他。
+            assertEquals("他看着我，冷冷地说：${SpeechRoleTagger.MALE_TAG}“你来晚了。”", out[1])
+            // 同一句里先出现我、后出现他，说话的是离引号最近的他。
+            assertEquals("我看着他，他说：${SpeechRoleTagger.MALE_TAG}“坐。”", out[2])
+        } finally {
+            SpeechRoleTagger.leadNamesProvider = { "" }
+        }
+    }
+
+    @Test
     fun narrationWithoutDialogueIsUntouched() {
         val text = "他走进屋里，她抬头看了一眼。"
         val tagged = SpeechRoleTagger.tag(text, RoleTagState())
