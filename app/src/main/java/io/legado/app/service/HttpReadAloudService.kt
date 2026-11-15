@@ -307,9 +307,10 @@ class HttpReadAloudService : BaseReadAloudService(),
         content: String,
         chapter: TextChapter,
         request: ParagraphAudioRequest,
+        cacheContent: String = content,
     ): String = buildHttpTtsCacheFileName(
         chapter.title, request.httpTts.url, request.rate,
-        request.variable + roleTagCacheKey(), request.loginHeader, content,
+        request.variable + roleTagCacheKey(), request.loginHeader, cacheContent,
     )
 
     private fun downloadAndPlayParagraphAudios(stream: Boolean) {
@@ -345,7 +346,6 @@ class HttpReadAloudService : BaseReadAloudService(),
                         ensureActive()
                         checkParagraphRequest(request)
                         val speech = speechItems[index]
-                        val fileName = paragraphCacheName(speech.text, chapter, request)
                         val duration = normalizeHttpTtsPauseDuration(httpTts.pauseDuration)
                         val insertPause = shouldInsertParagraphPause(
                             speech.item.id, speechItems.getOrNull(index + 1)?.item?.id, duration,
@@ -355,6 +355,7 @@ class HttpReadAloudService : BaseReadAloudService(),
                         } else {
                             speech.text
                         }
+                        val fileName = paragraphCacheName(speech.text, chapter, request, taggedText)
                         if (stream) {
                             val factory = createParagraphDataSourceFactory(request, speech.text, taggedText)
                             downloaderChannel.send(createDownloader(factory, fileName))
@@ -484,12 +485,12 @@ class HttpReadAloudService : BaseReadAloudService(),
                 ensureActive()
                 checkParagraphRequest(request)
                 try {
-                    val name = paragraphCacheName(speech.text, target, request)
                     val roleTaggedText = if (AppConfig.ttsRoleTag) {
                         SpeechRoleTagger.tag(speech.text, request.roleTagState).text
                     } else {
                         speech.text
                     }
+                    val name = paragraphCacheName(speech.text, target, request, roleTaggedText)
                     if (request.stream) {
                         val downloader = createDownloader(
                             createParagraphDataSourceFactory(
@@ -553,13 +554,13 @@ class HttpReadAloudService : BaseReadAloudService(),
                     if (paragraphStartPos > 0 && index == nowSpeak) {
                         text = text.substring(paragraphStartPos)
                     }
-                    val fileName = md5SpeakFileName(text)
                     val speakText = text.replace(AppPattern.notReadAloudRegex, "")
                     val roleTaggedText = if (AppConfig.ttsRoleTag && speakText.isNotEmpty()) {
                         SpeechRoleTagger.tag(speakText, roleTagState).text
                     } else {
                         speakText
                     }
+                    val fileName = md5SpeakFileName(text, cacheContent = roleTaggedText)
                     if (speakText.isEmpty()) {
                         AppLog.put("阅读段落内容为空，使用无声音频代替。\n朗读文本：$text")
                         createSilentSound(fileName)
@@ -618,13 +619,13 @@ class HttpReadAloudService : BaseReadAloudService(),
             .toList()
         contentList.forEach { content ->
             currentCoroutineContext().ensureActive()
-            val fileName = md5SpeakFileName(content, textChapter)
             val speakText = content.replace(AppPattern.notReadAloudRegex, "")
             val roleTaggedText = if (AppConfig.ttsRoleTag && speakText.isNotEmpty()) {
                 SpeechRoleTagger.tag(speakText, roleTagState).text
             } else {
                 speakText
             }
+            val fileName = md5SpeakFileName(content, textChapter, roleTaggedText)
             if (speakText.isEmpty()) {
                 createSilentSound(fileName)
             } else if (!hasSpeakFile(fileName)) {
@@ -680,12 +681,12 @@ class HttpReadAloudService : BaseReadAloudService(),
                         if (speakText.isEmpty()) {
                             AppLog.put("阅读段落内容为空，使用无声音频代替。\n朗读文本：$speakText")
                         }
-                        val fileName = md5SpeakFileName(text)
                         val roleTaggedText = if (AppConfig.ttsRoleTag) {
                             SpeechRoleTagger.tag(speakText, roleTagState).text
                         } else {
                             speakText
                         }
+                        val fileName = md5SpeakFileName(text, cacheContent = roleTaggedText)
                         val dataSourceFactory = createDataSourceFactory(
                             httpTts,
                             speakText,
@@ -741,13 +742,13 @@ class HttpReadAloudService : BaseReadAloudService(),
             .toList()
         contentList.forEach { content ->
             currentCoroutineContext().ensureActive()
-            val fileName = md5SpeakFileName(content, textChapter)
             val speakText = content.replace(AppPattern.notReadAloudRegex, "")
             val roleTaggedText = if (AppConfig.ttsRoleTag && speakText.isNotEmpty()) {
                 SpeechRoleTagger.tag(speakText, roleTagState).text
             } else {
                 speakText
             }
+            val fileName = md5SpeakFileName(content, textChapter, roleTaggedText)
             val dataSourceFactory = createDataSourceFactory(
                 httpTts, speakText, sessionId, roleTaggedText,
             )
@@ -939,7 +940,11 @@ class HttpReadAloudService : BaseReadAloudService(),
         return null
     }
 
-    private fun md5SpeakFileName(content: String, textChapter: TextChapter? = this.textChapter): String {
+    private fun md5SpeakFileName(
+        content: String,
+        textChapter: TextChapter? = this.textChapter,
+        cacheContent: String = content,
+    ): String {
         val httpTts = ReadAloud.httpTTS
         return buildHttpTtsCacheFileName(
             textChapter?.title.orEmpty(),
@@ -947,7 +952,7 @@ class HttpReadAloudService : BaseReadAloudService(),
             speechRate,
             httpTts?.getVariable().orEmpty() + roleTagCacheKey(),
             httpTts?.getLoginHeader().orEmpty(),
-            content,
+            cacheContent,
         )
     }
 
