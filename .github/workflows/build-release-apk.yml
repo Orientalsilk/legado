@@ -43,10 +43,11 @@ jobs:
           } >> "$GITHUB_WORKSPACE/gradle.properties"
 
       - name: Unit test (multi-role tagger)
-        continue-on-error: true
         run: |
           chmod +x gradlew
-          ./gradlew :app:testAppReleaseUnitTest --tests 'io.legado.app.service.SpeechRoleTaggerTest' \
+          ./gradlew :app:testAppReleaseUnitTest \
+            --tests 'io.legado.app.service.SpeechRoleTaggerTest' \
+            --tests 'io.legado.app.service.TtsSpeechChunkTest' \
             --build-cache --warning-mode all
 
       - name: Build release APK
