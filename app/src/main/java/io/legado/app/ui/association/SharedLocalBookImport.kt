@@ -15,6 +15,25 @@ import io.legado.app.utils.openInputStream
 import splitties.init.appCtx
 import java.io.File
 
+/**
+ * Returns true only when the incoming document is already the exact file in the
+ * configured library directory. This avoids copying a library file onto itself.
+ */
+internal fun isSameLocalBookFile(file: FileDoc, directory: Uri): Boolean {
+    if (file.isContentScheme && directory.isContentScheme()) {
+        val tree = DocumentFile.fromTreeUri(appCtx, directory) ?: return false
+        return tree.findFile(file.name)?.uri == file.uri
+    }
+    val source = file.asFile() ?: return false
+    val targetDirectory = directory.path?.let(::File) ?: return false
+    return isSameLocalBookPath(source, targetDirectory)
+}
+
+internal fun isSameLocalBookPath(source: File, directory: File): Boolean =
+    runCatching {
+        source.isFile && source.canonicalFile.parentFile == directory.canonicalFile
+    }.getOrDefault(false)
+
 /** Own the complete input batch before showing a preview or opening a reader. */
 internal fun collectSharedImportFiles(uris: List<Uri>, staging: File): List<File> =
     uris.distinct().flatMapIndexed { index, uri ->
