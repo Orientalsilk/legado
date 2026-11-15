@@ -37,6 +37,10 @@ jobs:
           ./gradlew :app:testAppDebugUnitTest \
             --tests 'io.legado.app.service.SpeechRoleTaggerTest' \
             --tests 'io.legado.app.service.TtsSpeechChunkTest' \
+            --tests 'io.legado.app.service.TtsPageFollowTest' \
+            --tests 'io.legado.app.ui.book.read.ReadAloudPageHighlightTest' \
+            --tests 'io.legado.app.ui.association.SharedImportAssociationTest' \
+            --tests 'io.legado.app.ui.font.FontImportTest' \
             --build-cache --warning-mode all
 
       - name: Build debug APK
