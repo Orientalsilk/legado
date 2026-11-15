@@ -74,6 +74,7 @@ object PreferKey {
     const val readAloudControlsY = "readAloudControlsY"
     const val ttsEngine = "appTtsEngine"
     const val ttsFollowSys = "ttsFollowSys"
+    const val ttsRoleTag = "ttsRoleTag"
     const val ttsSpeechRate = "ttsSpeechRate"
     const val prevKeys = "prevKeyCodes"
     const val nextKeys = "nextKeyCodes"

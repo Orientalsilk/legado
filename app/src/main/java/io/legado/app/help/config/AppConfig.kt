@@ -445,6 +445,13 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
             appCtx.putPrefBoolean(PreferKey.ttsFollowSys, value)
         }
 
+    /** 多角色朗读：给男/女对话加表情标记，供支持标记选声的 TTS 引擎使用 */
+    var ttsRoleTag: Boolean
+        get() = appCtx.getPrefBoolean(PreferKey.ttsRoleTag, false)
+        set(value) {
+            appCtx.putPrefBoolean(PreferKey.ttsRoleTag, value)
+        }
+
     val noAnimScrollPage: Boolean
         get() = appCtx.getPrefBoolean(PreferKey.noAnimScrollPage, false)
 

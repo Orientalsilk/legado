@@ -318,6 +318,7 @@
     <string name="check_book_source">校驗書源</string>
     <string name="check_select_source">校驗所選</string>
     <string name="progress_show">%1$s      進度 %2$d/%3$d</string>
+    <string name="tts_role_tag">多角色標記（系統TTS）</string>
     <string name="tts_fix">請安裝並選擇中文TTS！</string>
     <string name="tts_init_failed">TTS初始化失敗！</string>
     <string name="jf_convert">簡繁轉換</string>

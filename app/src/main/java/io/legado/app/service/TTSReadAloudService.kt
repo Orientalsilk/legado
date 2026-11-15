@@ -22,6 +22,7 @@ import io.legado.app.utils.servicePendingIntent
 import io.legado.app.utils.toastOnUi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
 
 internal fun pendingSpeechPageMoves(currentPageIndex: Int, targetPageIndex: Int): Int =
@@ -50,6 +51,8 @@ class TTSReadAloudService : BaseReadAloudService() {
     private val ttsUtteranceListener = TTSUtteranceListener()
     private var speakJob: Coroutine<*>? = null
     private val playbackSessionId = AtomicLong()
+    private val roleTagState = RoleTagState()
+    private val utteranceTags = ConcurrentHashMap<String, TaggedSpeech>()
     private val callbackHandler by lazy { buildMainHandler() }
     private val TAG = "TTSReadAloudService"
 
@@ -126,6 +129,8 @@ class TTSReadAloudService : BaseReadAloudService() {
             return
         }
         super.play()
+        roleTagState.reset()
+        utteranceTags.clear()
         if (paragraphMode) {
             restartParagraphSession()
             playParagraphQueue(sessionId)
@@ -233,6 +238,7 @@ class TTSReadAloudService : BaseReadAloudService() {
     override fun playStop() {
         playbackSessionId.incrementAndGet()
         speakJob?.cancel()
+        utteranceTags.clear()
         textToSpeech?.runCatching {
             stop()
         }
@@ -318,7 +324,7 @@ class TTSReadAloudService : BaseReadAloudService() {
                 if (paragraphMode) {
                     val index = utteranceParagraphIndex(utteranceId) ?: return@dispatchCurrentCallback
                     val speech = paragraphSpeechItems[index]
-                    upTtsProgress(speech.item.canonicalPositionAt(speech.textStart + start))
+                    upTtsProgress(speech.item.canonicalPositionAt(speech.textStart + originalRangeStart(utteranceId, start)))
                     return@dispatchCurrentCallback
                 }
                 val msg =
@@ -328,7 +334,7 @@ class TTSReadAloudService : BaseReadAloudService() {
                     rangeCallbackLogged = true
                     AppLog.putDebug("$TAG $msg")
                 }
-                val position = utterancePosition(utteranceId) + start
+                val position = utterancePosition(utteranceId) + originalRangeStart(utteranceId, start)
                 moveToSpeechPage(position)
                 upTtsProgress(position)
             }
@@ -385,6 +391,12 @@ class TTSReadAloudService : BaseReadAloudService() {
 
     }
 
+    /** 把引擎回调的偏移（含多角色标记）换算回原文偏移。 */
+    private fun originalRangeStart(utteranceId: String?, start: Int): Int {
+        val tagged = utteranceId?.let { utteranceTags[it] } ?: return start
+        return tagged.toOriginalOffset(start)
+    }
+
     private fun utterancePosition(id: String?): Int =
         id?.split(':', limit = 5)?.getOrNull(3)?.toIntOrNull() ?: readAloudNumber
 
@@ -408,9 +420,20 @@ class TTSReadAloudService : BaseReadAloudService() {
         synchronized(this) {
             if (!isCurrentPlayback(sessionId)) return null
             val tts = textToSpeech ?: return TextToSpeech.ERROR
+            val id = utteranceId(sessionId, index, position, last)
+            var speakText = text
+            if (AppConfig.ttsRoleTag) {
+                runCatching { SpeechRoleTagger.tag(text, roleTagState) }.getOrNull()?.let {
+                    if (it.hasTags && it.text.length <= TextToSpeech.getMaxSpeechInputLength()) {
+                        speakText = it.text
+                        utteranceTags[id] = it
+                    }
+                }
+            }
             return tts.runCatching {
-                speak(text, queueMode, null, utteranceId(sessionId, index, position, last))
+                speak(speakText, queueMode, null, id)
             }.getOrElse {
+                utteranceTags.remove(id)
                 AppLog.put("tts出错\n${it.localizedMessage}", it, true)
                 TextToSpeech.ERROR
             }

@@ -83,6 +83,7 @@ class ReadAloudDialog : BaseDialogFragment(R.layout.dialog_read_aloud),
             ivSetting.setColorFilter(textColor)
             tvSetting.setTextColor(textColor)
             cbTtsFollowSys.setTextColor(textColor)
+            cbTtsRoleTag.setTextColor(textColor)
             ivEngine.setColorFilter(textColor)
             tvEngineName.setTextColor(textColor)
             ivEngineArrow.setColorFilter(textColor)
@@ -97,6 +98,7 @@ class ReadAloudDialog : BaseDialogFragment(R.layout.dialog_read_aloud),
         upStopText()
         cbTtsFollowSys.isChecked = requireContext().getPrefBoolean("ttsFollowSys", true)
         upTtsSpeechRateEnabled(!cbTtsFollowSys.isChecked)
+        cbTtsRoleTag.isChecked = AppConfig.ttsRoleTag
         upSeekTimer()
     }
 
@@ -134,6 +136,9 @@ class ReadAloudDialog : BaseDialogFragment(R.layout.dialog_read_aloud),
         ivPlayNext.setOnClickListener { ReadAloud.nextParagraph(requireContext()) }
         llCatalog.setOnClickListener { callBack?.openChapterList() }
         llToBackstage.setOnClickListener { callBack?.finish() }
+        cbTtsRoleTag.setOnCheckedChangeListener { _, isChecked ->
+            AppConfig.ttsRoleTag = isChecked
+        }
         cbTtsFollowSys.setOnCheckedChangeListener { _, isChecked ->
             AppConfig.ttsFlowSys = isChecked
             upTtsSpeechRateEnabled(!isChecked)
