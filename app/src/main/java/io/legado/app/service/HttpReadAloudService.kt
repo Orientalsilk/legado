@@ -485,13 +485,15 @@ class HttpReadAloudService : BaseReadAloudService(),
                 checkParagraphRequest(request)
                 try {
                     val name = paragraphCacheName(speech.text, target, request)
+                    val roleTaggedText = if (AppConfig.ttsRoleTag) {
+                        SpeechRoleTagger.tag(speech.text, request.roleTagState).text
+                    } else {
+                        speech.text
+                    }
                     if (request.stream) {
                         val downloader = createDownloader(
                             createParagraphDataSourceFactory(
-                                request, speech.text,
-                                if (AppConfig.ttsRoleTag) SpeechRoleTagger.tag(speech.text, request.roleTagState).text
-                                else speech.text,
-                                prefetch = true,
+                                request, speech.text, roleTaggedText, prefetch = true,
                             ), name,
                         )
                         prefetchDownloader.set(downloader)
@@ -505,11 +507,7 @@ class HttpReadAloudService : BaseReadAloudService(),
                         val input = getSpeakStream(
                             request.httpTts, speech.text, request.sessionId,
                             prefetch = true, requestRate = request.rate,
-                            roleTaggedText = if (AppConfig.ttsRoleTag) {
-                                SpeechRoleTagger.tag(speech.text, request.roleTagState).text
-                            } else {
-                                speech.text
-                            },
+                            roleTaggedText = roleTaggedText,
                         ) ?: continue
                         writeParagraphAudio(name, input, request)
                     }
@@ -543,7 +541,9 @@ class HttpReadAloudService : BaseReadAloudService(),
                 val httpTts = ReadAloud.httpTTS ?: throw NoStackTraceException("tts is null")
                 val roleTagState = RoleTagState()
                 contentList.take(nowSpeak).forEach { prior ->
-                    if (AppConfig.ttsRoleTag) SpeechRoleTagger.tag(prior, roleTagState)
+                    if (AppConfig.ttsRoleTag) {
+                        SpeechRoleTagger.tag(prior.replace(AppPattern.notReadAloudRegex, ""), roleTagState)
+                    }
                 }
                 contentList.forEachIndexed { index, content ->
                     ensureActive()
