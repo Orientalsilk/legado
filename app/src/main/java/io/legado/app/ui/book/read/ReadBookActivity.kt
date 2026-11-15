@@ -189,6 +189,20 @@ import io.legado.app.ui.association.ImportBookSourceDialog
 /**
  * 阅读界面
  */
+internal fun readAloudSpanStartOnPage(
+    progressPosition: Int,
+    paragraphStart: Int,
+    paragraphEnd: Int,
+    pageStart: Int,
+    pageEnd: Int,
+): Int? {
+    if (paragraphStart >= paragraphEnd || pageStart >= pageEnd) return null
+    if (paragraphStart >= pageEnd || paragraphEnd <= pageStart || progressPosition >= pageEnd) {
+        return null
+    }
+    return (maxOf(progressPosition, paragraphStart, pageStart) - pageStart).coerceAtLeast(0)
+}
+
 class ReadBookActivity : BaseReadBookActivity(),
     View.OnTouchListener,
     ReadView.CallBack,
@@ -1902,12 +1916,25 @@ class ReadBookActivity : BaseReadBookActivity(),
         if (chapterStart < 0 || chapterIndex != ReadBook.durChapterIndex) return
         val chapter = ReadBook.curTextChapter ?: return
         if (binding.readView.curPage.textPage !== chapter.getPage(ReadBook.durPageIndex)) return
-        val (visibleChapter, line) = binding.readView.getReadAloudPos() ?: return
-        if (visibleChapter != chapterIndex) return
-        val speakingPage = chapter.getPageByReadPos(chapterStart) ?: return
-        if (chapter.getPageByReadPos(line.chapterPosition) !== speakingPage) return
-        ReadAloud.restoreReadAloudFollow()
-        speakingPage.upPageAloudSpan(chapterStart - chapter.getReadLength(speakingPage.index))
+        val visiblePage = chapter.getPage(ReadBook.durPageIndex) ?: return
+        if (binding.readView.curPage.textPage !== visiblePage) return
+        val paragraph = chapter.getParagraphs(false).firstOrNull {
+            chapterStart in it.chapterIndices
+        } ?: return
+        val pageStart = visiblePage.chapterPosition
+        val spanStart = readAloudSpanStartOnPage(
+            progressPosition = chapterStart,
+            paragraphStart = paragraph.chapterPosition,
+            paragraphEnd = paragraph.lastLine.chapterPosition + paragraph.lastLine.charSize,
+            pageStart = pageStart,
+            pageEnd = pageStart + visiblePage.charSize,
+        ) ?: return
+        // Keep manual navigation detached until speech itself reaches this page.
+        // Still render the continuation of the current paragraph on the visible page.
+        if (chapter.getPageByReadPos(chapterStart) === visiblePage) {
+            ReadAloud.restoreReadAloudFollow()
+        }
+        visiblePage.upPageAloudSpan(spanStart)
         binding.readView.upContent(resetPageOffset = false)
     }
 
