@@ -46,7 +46,7 @@ import java.io.File
 class FontSelectDialog : BaseDialogFragment(R.layout.dialog_font_select),
     Toolbar.OnMenuItemClickListener,
     FontAdapter.CallBack {
-    private val fontRegex = Regex("(?i).*\\.[ot]tf")
+    private val fontRegex = Regex("(?i).*\\.(?:ttf|otf|ttc|otc)$")
     private val binding by viewBinding(DialogFontSelectBinding::bind)
     private val adapter by lazy {
         val curFontPath = callBack?.curFontPath ?: ""
