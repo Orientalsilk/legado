@@ -1915,7 +1915,6 @@ class ReadBookActivity : BaseReadBookActivity(),
         val chapterIndex = ReadAloud.readAloudChapterIndex
         if (chapterStart < 0 || chapterIndex != ReadBook.durChapterIndex) return
         val chapter = ReadBook.curTextChapter ?: return
-        if (binding.readView.curPage.textPage !== chapter.getPage(ReadBook.durPageIndex)) return
         val visiblePage = chapter.getPage(ReadBook.durPageIndex) ?: return
         if (binding.readView.curPage.textPage !== visiblePage) return
         val paragraph = chapter.getParagraphs(false).firstOrNull {
