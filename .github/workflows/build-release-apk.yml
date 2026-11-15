@@ -1,10 +1,12 @@
-name: Build Debug APK
+name: Build Release APK
 
 on:
   workflow_dispatch:
   push:
     branches:
-      - 'feature/**'
+      - master
+    paths-ignore:
+      - '**/*.md'
 
 permissions:
   contents: read
@@ -15,6 +17,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
       - name: Setup JDK 21
         uses: actions/setup-java@v6
@@ -28,23 +32,33 @@ jobs:
       - name: Prepare Assets
         run: echo "" > "$GITHUB_WORKSPACE/app/src/main/assets/18PlusList.txt"
 
+      - name: Configure signing (personal key)
+        run: |
+          cp "$GITHUB_WORKSPACE/.github/signing/personal.jks" "$GITHUB_WORKSPACE/app/personal.jks"
+          {
+            echo "RELEASE_STORE_FILE=./personal.jks"
+            echo "RELEASE_STORE_PASSWORD=legado123456"
+            echo "RELEASE_KEY_ALIAS=legado"
+            echo "RELEASE_KEY_PASSWORD=legado123456"
+          } >> "$GITHUB_WORKSPACE/gradle.properties"
+
       - name: Unit test (multi-role tagger)
         continue-on-error: true
         run: |
           chmod +x gradlew
-          ./gradlew :app:testAppDebugUnitTest --tests 'io.legado.app.service.SpeechRoleTaggerTest' \
+          ./gradlew :app:testAppReleaseUnitTest --tests 'io.legado.app.service.SpeechRoleTaggerTest' \
             --build-cache --warning-mode all
 
-      - name: Build debug APK
+      - name: Build release APK
         run: |
           chmod +x gradlew
-          ./gradlew :app:assembleAppDebug -ParmOnly=true --build-cache --warning-mode all
+          ./gradlew :app:assembleAppRelease -ParmOnly=true --build-cache --warning-mode all
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: legado-debug-apk
-          path: app/build/outputs/apk/app/debug/*.apk
+          name: legado-release-apk
+          path: app/build/outputs/apk/app/release/*.apk
           if-no-files-found: error
 
       - name: Upload test report
