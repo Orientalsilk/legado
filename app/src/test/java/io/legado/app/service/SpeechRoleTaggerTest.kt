@@ -2,6 +2,7 @@ package io.legado.app.service
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -75,6 +76,25 @@ class SpeechRoleTaggerTest {
     fun quotedTermWithoutPunctuationIsNotDialogue() {
         val text = "所谓“正义”，不过是一句空话。"
         assertFalse(SpeechRoleTagger.tag(text, RoleTagState()).hasTags)
+    }
+
+    @Test
+    fun audioCacheIdentityIncludesTheActualRoleTaggedText() {
+        val plain = buildHttpTtsCacheFileName(
+            "chapter", "https://tts.example/voice", 100, "variable", "header", "“你好。”"
+        )
+        val male = buildHttpTtsCacheFileName(
+            "chapter", "https://tts.example/voice", 100, "variable", "header",
+            SpeechRoleTagger.MALE_TAG + "“你好。”"
+        )
+        val female = buildHttpTtsCacheFileName(
+            "chapter", "https://tts.example/voice", 100, "variable", "header",
+            SpeechRoleTagger.FEMALE_TAG + "“你好。”"
+        )
+
+        assertNotEquals(plain, male)
+        assertNotEquals(plain, female)
+        assertNotEquals(male, female)
     }
 
     @Test
