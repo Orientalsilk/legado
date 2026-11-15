@@ -49,7 +49,7 @@ class SharedImportAssociationTest {
 
     @Test
     fun `opening a book already in the destination directory does not require a copy`() {
-        val root = createTempDir(prefix = "legado-library-")
+        val root = kotlin.io.path.createTempDirectory("legado-library-").toFile()
         try {
             val library = File(root, "books").apply { mkdirs() }
             val source = File(library, "novel.txt").apply { writeText("chapter") }
