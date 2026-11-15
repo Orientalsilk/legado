@@ -135,6 +135,9 @@ internal fun generateSilentWavBytes(durationMs: Int): ByteArray {
         .array()
 }
 
+/** 开启多角色标记后音频内容不同，缓存要和未开启时分开。 */
+private fun roleTagCacheKey(): String = if (AppConfig.ttsRoleTag) "#roletag1" else ""
+
 internal fun buildHttpTtsCacheFileName(
     chapterTitle: String,
     sourceUrl: String?,
@@ -305,7 +308,7 @@ class HttpReadAloudService : BaseReadAloudService(),
         request: ParagraphAudioRequest,
     ): String = buildHttpTtsCacheFileName(
         chapter.title, request.httpTts.url, request.rate,
-        request.variable, request.loginHeader, content,
+        request.variable + roleTagCacheKey(), request.loginHeader, content,
     )
 
     private fun downloadAndPlayParagraphAudios(stream: Boolean) {
@@ -765,9 +768,15 @@ class HttpReadAloudService : BaseReadAloudService(),
         while (true) {
             ensureSessionActive(sessionId)
             try {
+                val sendText = if (AppConfig.ttsRoleTag) {
+                    runCatching { SpeechRoleTagger.tag(speakText, RoleTagState()).text }
+                        .getOrDefault(speakText)
+                } else {
+                    speakText
+                }
                 val analyzeUrl = AnalyzeUrl(
                     httpTts.url,
-                    speakText = speakText,
+                    speakText = sendText,
                     speakSpeed = requestRate,
                     source = httpTts,
                     readTimeout = 300 * 1000L,
@@ -869,7 +878,7 @@ class HttpReadAloudService : BaseReadAloudService(),
             textChapter?.title.orEmpty(),
             httpTts?.url,
             speechRate,
-            httpTts?.getVariable().orEmpty(),
+            httpTts?.getVariable().orEmpty() + roleTagCacheKey(),
             httpTts?.getLoginHeader().orEmpty(),
             content,
         )
