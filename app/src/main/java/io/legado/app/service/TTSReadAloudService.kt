@@ -93,6 +93,7 @@ class TTSReadAloudService : BaseReadAloudService() {
     fun clearTTS() {
         ttsInitGeneration++
         playbackSessionId.incrementAndGet()
+        utteranceTags.clear()
         textToSpeech?.runCatching {
             stop()
             shutdown()
@@ -309,6 +310,9 @@ class TTSReadAloudService : BaseReadAloudService() {
 
         override fun onDone(s: String) {
             dispatchCurrentCallback(s) {
+                // Range callbacks are delivered before completion; release the offset map
+                // as soon as this utterance can no longer report progress.
+                utteranceTags.remove(s)
                 if (paragraphMode) {
                     utteranceParagraphIndex(s)?.let(::paragraphFinished)
                     return@dispatchCurrentCallback
@@ -342,6 +346,7 @@ class TTSReadAloudService : BaseReadAloudService() {
 
         override fun onError(utteranceId: String?, errorCode: Int) {
             dispatchCurrentCallback(utteranceId) {
+                utteranceId?.let(utteranceTags::remove)
                 if (paragraphMode) {
                     pauseReadAloud()
                     return@dispatchCurrentCallback
@@ -370,6 +375,7 @@ class TTSReadAloudService : BaseReadAloudService() {
         @Deprecated("Deprecated in Java")
         override fun onError(s: String) {
             dispatchCurrentCallback(s) {
+                utteranceTags.remove(s)
                 if (paragraphMode) {
                     pauseReadAloud()
                     return@dispatchCurrentCallback
@@ -433,9 +439,11 @@ class TTSReadAloudService : BaseReadAloudService() {
             return tts.runCatching {
                 speak(speakText, queueMode, null, id)
             }.getOrElse {
-                utteranceTags.remove(id)
                 AppLog.put("tts出错\n${it.localizedMessage}", it, true)
                 TextToSpeech.ERROR
+            }.also { result ->
+                // Some engines return ERROR instead of throwing and never send onError.
+                if (result == TextToSpeech.ERROR) utteranceTags.remove(id)
             }
         }
     }
