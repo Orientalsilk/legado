@@ -9,9 +9,14 @@ package io.legado.app.service
  */
 internal enum class SpeakerGender { MALE, FEMALE }
 
+/** 对应 MultiTTS 里的“青年 / 少年 / 老年”三档声音。 */
+internal enum class SpeakerAge { ADULT, YOUTH, ELDER }
+
+internal data class Speaker(val gender: SpeakerGender, val age: SpeakerAge = SpeakerAge.ADULT)
+
 /** 跨段落的判断状态：上一段对话的说话人，用来处理“一问一答”的交替。 */
 internal class RoleTagState {
-    var lastGender: SpeakerGender? = null
+    var lastGender: Speaker? = null
 
     /** 距离上一段有对话的段落已过几段；0 表示紧邻的上一段有对话。 */
     var age: Int = 99
@@ -47,11 +52,31 @@ internal class TaggedSpeech(
 
 internal object SpeechRoleTagger {
 
-    /** 男声标记：不可见、不会被朗读（U+2060 U+200C U+2060） */
+    /**
+     * 不可见标记，只用 U+2060 / U+200C / U+200D 组合，互相不会成为对方的子串：
+     * 青年  男 2060 200C 2060      女 2060 200D 2060
+     * 少年  男 2060 200C 200C 2060 女 2060 200D 200D 2060
+     * 老年  男 2060 200C 200D 2060 女 2060 200D 200C 2060
+     */
     const val MALE_TAG = "\u2060\u200C\u2060"
-
-    /** 女声标记：不可见、不会被朗读（U+2060 U+200D U+2060） */
     const val FEMALE_TAG = "\u2060\u200D\u2060"
+    const val MALE_YOUTH_TAG = "\u2060\u200C\u200C\u2060"
+    const val FEMALE_YOUTH_TAG = "\u2060\u200D\u200D\u2060"
+    const val MALE_ELDER_TAG = "\u2060\u200C\u200D\u2060"
+    const val FEMALE_ELDER_TAG = "\u2060\u200D\u200C\u2060"
+
+    private fun tagOf(speaker: Speaker): String = when (speaker.gender) {
+        SpeakerGender.MALE -> when (speaker.age) {
+            SpeakerAge.ADULT -> MALE_TAG
+            SpeakerAge.YOUTH -> MALE_YOUTH_TAG
+            SpeakerAge.ELDER -> MALE_ELDER_TAG
+        }
+        SpeakerGender.FEMALE -> when (speaker.age) {
+            SpeakerAge.ADULT -> FEMALE_TAG
+            SpeakerAge.YOUTH -> FEMALE_YOUTH_TAG
+            SpeakerAge.ELDER -> FEMALE_ELDER_TAG
+        }
+    }
 
     private val openToClose = mapOf('“' to '”', '「' to '」', '『' to '』', '"' to '"')
 
@@ -69,6 +94,13 @@ internal object SpeechRoleTagger {
 
     private val femaleSet = femaleWords.toSet()
 
+    /** 这些称呼落在“少年”或“老年”声音上，和 MultiTTS 的角色规则保持一致。 */
+    private val youthWords = setOf("少年", "男孩", "儿子", "少女", "女孩", "丫头", "女儿", "公主")
+    private val elderWords = setOf(
+        "老者", "老头", "父亲", "老爷", "将军", "皇帝",
+        "老妇", "婆婆", "奶奶", "母亲", "娘亲", "妈妈", "夫人", "皇后"
+    )
+
     private val wordRegex = Regex(
         (femaleWords + maleWords).sortedByDescending { it.length }
             .joinToString("|") { Regex.escape(it) }
@@ -84,10 +116,10 @@ internal object SpeechRoleTagger {
 
     private class Quote(val open: Int, val close: Int)
 
-    private class Candidate(val gender: SpeakerGender)
+    private class Candidate(val speaker: Speaker)
 
-    private fun SpeakerGender.flip(): SpeakerGender =
-        if (this == SpeakerGender.MALE) SpeakerGender.FEMALE else SpeakerGender.MALE
+    private fun Speaker.flip(): Speaker =
+        Speaker(if (gender == SpeakerGender.MALE) SpeakerGender.FEMALE else SpeakerGender.MALE)
 
     private fun findQuotes(text: String): List<Quote> {
         val result = ArrayList<Quote>()
@@ -132,7 +164,12 @@ internal object SpeechRoleTagger {
             }
             if (before != null && objectMarkers.indexOf(before) >= 0) continue
             val gender = if (word in femaleSet) SpeakerGender.FEMALE else SpeakerGender.MALE
-            result.add(Candidate(gender))
+            val age = when (word) {
+                in youthWords -> SpeakerAge.YOUTH
+                in elderWords -> SpeakerAge.ELDER
+                else -> SpeakerAge.ADULT
+            }
+            result.add(Candidate(Speaker(gender, age)))
         }
         return result
     }
@@ -149,7 +186,7 @@ internal object SpeechRoleTagger {
             return TaggedSpeech(text, IntArray(0), IntArray(0))
         }
         val previousAge = state.age
-        val genders = arrayOfNulls<SpeakerGender>(quotes.size)
+        val genders = arrayOfNulls<Speaker>(quotes.size)
         for (i in quotes.indices) {
             val q = quotes[i]
             val prevEnd = if (i == 0) -1 else quotes[i - 1].close
@@ -175,11 +212,11 @@ internal object SpeechRoleTagger {
                 }
             }
 
-            val fromBefore = candidates(beforeTail).lastOrNull()?.gender
-            val fromAfter = candidates(afterHead).firstOrNull()?.gender
+            val fromBefore = candidates(beforeTail).lastOrNull()?.speaker
+            val fromAfter = candidates(afterHead).firstOrNull()?.speaker
             val colonEnd = endsWithColon(before)
 
-            var g: SpeakerGender? =
+            var g: Speaker? =
                 if (colonEnd) fromBefore ?: fromAfter else fromAfter ?: fromBefore
 
             if (g == null) {
@@ -195,7 +232,7 @@ internal object SpeechRoleTagger {
             genders[i] = g
         }
 
-        var lastKnown: SpeakerGender? = null
+        var lastKnown: Speaker? = null
         for (g in genders) if (g != null) lastKnown = g
         if (lastKnown != null) {
             state.lastGender = lastKnown
@@ -211,7 +248,7 @@ internal object SpeechRoleTagger {
         var last = 0
         for (i in quotes.indices) {
             val g = genders[i] ?: continue
-            val tag = if (g == SpeakerGender.MALE) MALE_TAG else FEMALE_TAG
+            val tag = tagOf(g)
             sb.append(text, last, quotes[i].open)
             sb.append(tag)
             last = quotes[i].open

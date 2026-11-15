@@ -24,6 +24,33 @@ class SpeechRoleTaggerTest {
     }
 
     @Test
+    fun allSixTagsAreDistinctAndNoneContainsAnother() {
+        val tags = listOf(
+            SpeechRoleTagger.MALE_TAG, SpeechRoleTagger.FEMALE_TAG,
+            SpeechRoleTagger.MALE_YOUTH_TAG, SpeechRoleTagger.FEMALE_YOUTH_TAG,
+            SpeechRoleTagger.MALE_ELDER_TAG, SpeechRoleTagger.FEMALE_ELDER_TAG,
+        )
+        assertEquals(6, tags.toSet().size)
+        for (a in tags) for (b in tags) {
+            if (a != b) assertFalse("$a contains $b", a.contains(b))
+        }
+    }
+
+    @Test
+    fun elderAndYouthWordsPickTheirOwnVoice() {
+        val out = run(
+            "老者叹道：“你来了，坐吧。”",
+            "少女低声说：“我不去，我害怕。”",
+            "老妇笑着说：“好孩子，别怕。”",
+            "少年怒道：“我偏要去！”"
+        )
+        assertEquals("老者叹道：${SpeechRoleTagger.MALE_ELDER_TAG}“你来了，坐吧。”", out[0])
+        assertEquals("少女低声说：${SpeechRoleTagger.FEMALE_YOUTH_TAG}“我不去，我害怕。”", out[1])
+        assertEquals("老妇笑着说：${SpeechRoleTagger.FEMALE_ELDER_TAG}“好孩子，别怕。”", out[2])
+        assertEquals("少年怒道：${SpeechRoleTagger.MALE_YOUTH_TAG}“我偏要去！”", out[3])
+    }
+
+    @Test
     fun narrationWithoutDialogueIsUntouched() {
         val text = "他走进屋里，她抬头看了一眼。"
         val tagged = SpeechRoleTagger.tag(text, RoleTagState())
