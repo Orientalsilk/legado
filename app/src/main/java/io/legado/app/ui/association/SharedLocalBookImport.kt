@@ -31,7 +31,10 @@ internal fun isSameLocalBookFile(file: FileDoc, directory: Uri): Boolean {
 
 internal fun isSameLocalBookPath(source: File, directory: File): Boolean =
     runCatching {
-        source.isFile && source.canonicalFile.toPath().startsWith(directory.canonicalFile.toPath())
+        if (!source.isFile) return@runCatching false
+        val directoryPath = directory.canonicalPath.trimEnd(File.separatorChar)
+        val prefix = if (directoryPath.isEmpty()) File.separator else "$directoryPath${File.separator}"
+        source.canonicalPath.startsWith(prefix)
     }.getOrDefault(false)
 
 /** Own the complete input batch before showing a preview or opening a reader. */
