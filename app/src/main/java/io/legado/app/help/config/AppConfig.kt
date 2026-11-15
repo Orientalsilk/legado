@@ -452,6 +452,13 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
             appCtx.putPrefBoolean(PreferKey.ttsRoleTag, value)
         }
 
+    /** 男女主角名字：第一行男主，第二行女主，名字用顿号、逗号或竖线隔开 */
+    var ttsLeadNames: String
+        get() = appCtx.getPrefString(PreferKey.ttsLeadNames) ?: ""
+        set(value) {
+            appCtx.putPrefString(PreferKey.ttsLeadNames, value)
+        }
+
     val noAnimScrollPage: Boolean
         get() = appCtx.getPrefBoolean(PreferKey.noAnimScrollPage, false)
 

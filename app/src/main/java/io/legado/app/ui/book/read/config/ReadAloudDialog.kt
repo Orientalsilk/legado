@@ -12,8 +12,10 @@ import androidx.appcompat.widget.TooltipCompat
 import io.legado.app.R
 import io.legado.app.base.BaseDialogFragment
 import io.legado.app.constant.EventBus
+import io.legado.app.databinding.DialogEditTextBinding
 import io.legado.app.databinding.DialogReadAloudBinding
 import io.legado.app.help.config.AppConfig
+import io.legado.app.lib.dialogs.alert
 import io.legado.app.lib.theme.bottomBackground
 import io.legado.app.lib.theme.getPrimaryTextColor
 import io.legado.app.model.ReadAloud
@@ -84,6 +86,7 @@ class ReadAloudDialog : BaseDialogFragment(R.layout.dialog_read_aloud),
             tvSetting.setTextColor(textColor)
             cbTtsFollowSys.setTextColor(textColor)
             cbTtsRoleTag.setTextColor(textColor)
+            tvTtsLeadNames.setTextColor(textColor)
             ivEngine.setColorFilter(textColor)
             tvEngineName.setTextColor(textColor)
             ivEngineArrow.setColorFilter(textColor)
@@ -136,6 +139,7 @@ class ReadAloudDialog : BaseDialogFragment(R.layout.dialog_read_aloud),
         ivPlayNext.setOnClickListener { ReadAloud.nextParagraph(requireContext()) }
         llCatalog.setOnClickListener { callBack?.openChapterList() }
         llToBackstage.setOnClickListener { callBack?.finish() }
+        tvTtsLeadNames.setOnClickListener { showLeadNamesDialog() }
         cbTtsRoleTag.setOnCheckedChangeListener { _, isChecked ->
             AppConfig.ttsRoleTag = isChecked
         }
@@ -302,5 +306,22 @@ class ReadAloudDialog : BaseDialogFragment(R.layout.dialog_read_aloud),
         fun onClickReadAloud()
         fun backToSpeakingPosition()
         fun finish()
+    }
+
+    /** 男女主角名字：第一行男主，第二行女主。 */
+    private fun showLeadNamesDialog() {
+        val alertBinding = DialogEditTextBinding.inflate(layoutInflater).apply {
+            editView.hint = getString(R.string.tts_lead_names_hint)
+            editView.setText(AppConfig.ttsLeadNames)
+            editView.minLines = 2
+            editView.maxLines = 4
+        }
+        alert(getString(R.string.tts_lead_names)) {
+            customView { alertBinding.root }
+            okButton {
+                AppConfig.ttsLeadNames = alertBinding.editView.text.toString().trim()
+            }
+            cancelButton()
+        }
     }
 }

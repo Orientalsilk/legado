@@ -436,6 +436,7 @@ abstract class BaseReadAloudService : BaseService(),
         super.onCreate()
         currentService = this
         isRun = true
+        SpeechRoleTagger.leadNamesProvider = { AppConfig.ttsLeadNames }
         pause = false
         chapterStopTimer.clear()
         chapterToStop = 0

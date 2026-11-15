@@ -29,8 +29,9 @@ class SpeechRoleTaggerTest {
             SpeechRoleTagger.MALE_TAG, SpeechRoleTagger.FEMALE_TAG,
             SpeechRoleTagger.MALE_YOUTH_TAG, SpeechRoleTagger.FEMALE_YOUTH_TAG,
             SpeechRoleTagger.MALE_ELDER_TAG, SpeechRoleTagger.FEMALE_ELDER_TAG,
+            SpeechRoleTagger.MALE_LEAD_TAG, SpeechRoleTagger.FEMALE_LEAD_TAG,
         )
-        assertEquals(6, tags.toSet().size)
+        assertEquals(8, tags.toSet().size)
         for (a in tags) for (b in tags) {
             if (a != b) assertFalse("$a contains $b", a.contains(b))
         }
@@ -48,6 +49,24 @@ class SpeechRoleTaggerTest {
         assertEquals("少女低声说：${SpeechRoleTagger.FEMALE_YOUTH_TAG}“我不去，我害怕。”", out[1])
         assertEquals("老妇笑着说：${SpeechRoleTagger.FEMALE_ELDER_TAG}“好孩子，别怕。”", out[2])
         assertEquals("少年怒道：${SpeechRoleTagger.MALE_YOUTH_TAG}“我偏要去！”", out[3])
+    }
+
+    @Test
+    fun configuredLeadNamesUseTheLeadVoices() {
+        SpeechRoleTagger.leadNamesProvider = { "叶默、朱慈烺\n苏静雯" }
+        try {
+            val out = run(
+                "叶默淡淡地说：“走吧。”",
+                "苏静雯回头道：“等等我。”",
+                "李定国笑道：“你们去哪？”"
+            )
+            assertEquals("叶默淡淡地说：${SpeechRoleTagger.MALE_LEAD_TAG}“走吧。”", out[0])
+            assertEquals("苏静雯回头道：${SpeechRoleTagger.FEMALE_LEAD_TAG}“等等我。”", out[1])
+            // 没有配置的名字不会变成主角声音；没有性别线索时保持不加标记。
+            assertEquals("李定国笑道：“你们去哪？”", out[2])
+        } finally {
+            SpeechRoleTagger.leadNamesProvider = { "" }
+        }
     }
 
     @Test

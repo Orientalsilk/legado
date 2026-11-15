@@ -10,7 +10,7 @@ package io.legado.app.service
 internal enum class SpeakerGender { MALE, FEMALE }
 
 /** 对应 MultiTTS 里的“青年 / 少年 / 老年”三档声音。 */
-internal enum class SpeakerAge { ADULT, YOUTH, ELDER }
+internal enum class SpeakerAge { ADULT, YOUTH, ELDER, LEAD }
 
 internal data class Speaker(val gender: SpeakerGender, val age: SpeakerAge = SpeakerAge.ADULT)
 
@@ -57,6 +57,7 @@ internal object SpeechRoleTagger {
      * 青年  男 2060 200C 2060      女 2060 200D 2060
      * 少年  男 2060 200C 200C 2060 女 2060 200D 200D 2060
      * 老年  男 2060 200C 200D 2060 女 2060 200D 200C 2060
+     * 主角  男 2060 200C 200D 200D 2060 女 2060 200D 200C 200C 2060
      */
     const val MALE_TAG = "\u2060\u200C\u2060"
     const val FEMALE_TAG = "\u2060\u200D\u2060"
@@ -64,17 +65,25 @@ internal object SpeechRoleTagger {
     const val FEMALE_YOUTH_TAG = "\u2060\u200D\u200D\u2060"
     const val MALE_ELDER_TAG = "\u2060\u200C\u200D\u2060"
     const val FEMALE_ELDER_TAG = "\u2060\u200D\u200C\u2060"
+    const val MALE_LEAD_TAG = "\u2060\u200C\u200D\u200D\u2060"
+    const val FEMALE_LEAD_TAG = "\u2060\u200D\u200C\u200C\u2060"
+
+    /** 返回“男主、女主”名字的原始设置：第一行男主，第二行女主，名字用顿号、逗号或竖线隔开。 */
+    @Volatile
+    var leadNamesProvider: () -> String = { "" }
 
     private fun tagOf(speaker: Speaker): String = when (speaker.gender) {
         SpeakerGender.MALE -> when (speaker.age) {
             SpeakerAge.ADULT -> MALE_TAG
             SpeakerAge.YOUTH -> MALE_YOUTH_TAG
             SpeakerAge.ELDER -> MALE_ELDER_TAG
+            SpeakerAge.LEAD -> MALE_LEAD_TAG
         }
         SpeakerGender.FEMALE -> when (speaker.age) {
             SpeakerAge.ADULT -> FEMALE_TAG
             SpeakerAge.YOUTH -> FEMALE_YOUTH_TAG
             SpeakerAge.ELDER -> FEMALE_ELDER_TAG
+            SpeakerAge.LEAD -> FEMALE_LEAD_TAG
         }
     }
 
@@ -101,10 +110,43 @@ internal object SpeechRoleTagger {
         "老妇", "婆婆", "奶奶", "母亲", "娘亲", "妈妈", "夫人", "皇后"
     )
 
-    private val wordRegex = Regex(
-        (femaleWords + maleWords).sortedByDescending { it.length }
-            .joinToString("|") { Regex.escape(it) }
+    private class Matcher(
+        val regex: Regex,
+        val maleLeads: Set<String>,
+        val femaleLeads: Set<String>
     )
+
+    private val baseMatcher = buildMatcher(emptyList(), emptyList())
+
+    private var cachedRaw: String = ""
+    private var cachedMatcher: Matcher = baseMatcher
+
+    private fun buildMatcher(maleLeads: List<String>, femaleLeads: List<String>): Matcher {
+        val words = (femaleWords + maleWords + maleLeads + femaleLeads).distinct()
+        val regex = Regex(
+            words.sortedByDescending { it.length }.joinToString("|") { Regex.escape(it) }
+        )
+        return Matcher(regex, maleLeads.toSet(), femaleLeads.toSet())
+    }
+
+    private fun parseNames(line: String): List<String> =
+        line.split(Regex("[|,，、;；\\s]+")).map { it.trim() }.filter { it.length >= 2 }
+
+    @Synchronized
+    private fun currentMatcher(): Matcher {
+        val raw = runCatching { leadNamesProvider() }.getOrDefault("")
+        if (raw == cachedRaw) return cachedMatcher
+        val lines = raw.lines()
+        val male = parseNames(lines.getOrElse(0) { "" })
+        val female = parseNames(lines.getOrElse(1) { "" })
+        cachedMatcher = if (male.isEmpty() && female.isEmpty()) {
+            baseMatcher
+        } else {
+            buildMatcher(male, female)
+        }
+        cachedRaw = raw
+        return cachedMatcher
+    }
 
     /** 出现在称呼前面，说明这个称呼是“被…的人”（宾语），不是说话的人。 */
     private const val objectMarkers =
@@ -149,9 +191,9 @@ internal object SpeechRoleTagger {
         return prev == '：' || prev == ':'
     }
 
-    private fun candidates(seg: String): List<Candidate> {
+    private fun candidates(seg: String, matcher: Matcher): List<Candidate> {
         val result = ArrayList<Candidate>()
-        for (m in wordRegex.findAll(seg)) {
+        for (m in matcher.regex.findAll(seg)) {
             val s = m.range.first
             val e = m.range.last + 1
             val word = m.value
@@ -163,13 +205,20 @@ internal object SpeechRoleTagger {
                 if (before != null && "其别排利吉".indexOf(before) >= 0) continue
             }
             if (before != null && objectMarkers.indexOf(before) >= 0) continue
-            val gender = if (word in femaleSet) SpeakerGender.FEMALE else SpeakerGender.MALE
-            val age = when (word) {
-                in youthWords -> SpeakerAge.YOUTH
-                in elderWords -> SpeakerAge.ELDER
-                else -> SpeakerAge.ADULT
+            val speaker = when (word) {
+                in matcher.maleLeads -> Speaker(SpeakerGender.MALE, SpeakerAge.LEAD)
+                in matcher.femaleLeads -> Speaker(SpeakerGender.FEMALE, SpeakerAge.LEAD)
+                else -> {
+                    val gender = if (word in femaleSet) SpeakerGender.FEMALE else SpeakerGender.MALE
+                    val age = when (word) {
+                        in youthWords -> SpeakerAge.YOUTH
+                        in elderWords -> SpeakerAge.ELDER
+                        else -> SpeakerAge.ADULT
+                    }
+                    Speaker(gender, age)
+                }
             }
-            result.add(Candidate(Speaker(gender, age)))
+            result.add(Candidate(speaker))
         }
         return result
     }
@@ -186,6 +235,7 @@ internal object SpeechRoleTagger {
             return TaggedSpeech(text, IntArray(0), IntArray(0))
         }
         val previousAge = state.age
+        val matcher = currentMatcher()
         val genders = arrayOfNulls<Speaker>(quotes.size)
         for (i in quotes.indices) {
             val q = quotes[i]
@@ -212,8 +262,8 @@ internal object SpeechRoleTagger {
                 }
             }
 
-            val fromBefore = candidates(beforeTail).lastOrNull()?.speaker
-            val fromAfter = candidates(afterHead).firstOrNull()?.speaker
+            val fromBefore = candidates(beforeTail, matcher).lastOrNull()?.speaker
+            val fromAfter = candidates(afterHead, matcher).firstOrNull()?.speaker
             val colonEnd = endsWithColon(before)
 
             var g: Speaker? =

@@ -222,6 +222,15 @@
 
         </LinearLayout>
 
+        <TextView
+            android:id="@+id/tv_tts_lead_names"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="?attr/selectableItemBackground"
+            android:padding="12dp"
+            android:text="@string/tts_lead_names"
+            android:textSize="14sp" />
+
         <LinearLayout
             android:id="@+id/ll_tts_SpeechRate"
             android:layout_width="match_parent"

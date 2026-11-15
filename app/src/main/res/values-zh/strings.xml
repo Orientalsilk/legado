@@ -453,6 +453,8 @@
     <string name="check_book_source">校验书源</string>
     <string name="check_select_source">校验所选</string>
     <string name="progress_show">%1$s      进度 %2$d/%3$d</string>
+    <string name="tts_lead_names">设置男女主角名字</string>
+    <string name="tts_lead_names_hint">第一行写男主角名字，第二行写女主角名字，多个名字用顿号或逗号隔开</string>
     <string name="tts_role_tag">多角色标记</string>
     <string name="tts_fix">请安装并选择中文 TTS！</string>
     <string name="tts_init_failed">TTS 初始化失败！</string>
