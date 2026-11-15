@@ -48,6 +48,22 @@ class SharedImportAssociationTest {
     }
 
     @Test
+    fun `opening a book already in the destination directory does not require a copy`() {
+        val root = createTempDir(prefix = "legado-library-")
+        try {
+            val library = File(root, "books").apply { mkdirs() }
+            val source = File(library, "novel.txt").apply { writeText("chapter") }
+            val otherDirectory = File(root, "other").apply { mkdirs() }
+
+            assertTrue(isSameLocalBookPath(source, library))
+            assertFalse(isSameLocalBookPath(source, otherDirectory))
+            assertFalse(isSameLocalBookPath(library, library))
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
     fun `share import accepts supported json book and archive mime types`() {
         assertTrue(isSupportedSharedImportMimeType("text/plain"))
         assertTrue(isSupportedSharedImportMimeType("text/*"))
