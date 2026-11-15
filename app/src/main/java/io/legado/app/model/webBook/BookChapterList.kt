@@ -28,6 +28,20 @@ import splitties.init.appCtx
 import io.legado.app.constant.AppPattern
 import kotlinx.coroutines.currentCoroutineContext
 
+internal fun countChangedChapterUrls(
+    oldChapters: List<BookChapter>,
+    newChapters: List<BookChapter>,
+): Int {
+    val oldByIndex = oldChapters.associateBy { it.index }
+    return newChapters.count { current ->
+        if (current.isVolume) return@count false
+        val previous = oldByIndex[current.index] ?: return@count false
+        !previous.isVolume &&
+            previous.title == current.title &&
+            previous.getAbsoluteURL() != current.getAbsoluteURL()
+    }
+}
+
 /**
  * 获取目录
  */
@@ -307,10 +321,15 @@ object BookChapterList {
     }
 
     private fun upChapterInfo(list: ArrayList<BookChapter>, book: Book) {
+        val chapterList = appDb.bookChapterDao.getChapterList(book.bookUrl)
+        val changedUrlCount = countChangedChapterUrls(chapterList, list)
+        if (changedUrlCount > 0) {
+            book.lastCheckCount = maxOf(book.lastCheckCount, changedUrlCount)
+            book.latestChapterTime = System.currentTimeMillis()
+        }
         if (!AppConfig.tocCountWords) {
             return
         }
-        val chapterList = appDb.bookChapterDao.getChapterList(book.bookUrl)
         if (chapterList.isNotEmpty()) {
             val map = HashMap<String, Triple<String?, String?, String?>>(chapterList.size)
             for (chapter in chapterList) {
