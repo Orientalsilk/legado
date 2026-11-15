@@ -15,6 +15,7 @@ import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.HighlightRuleFile
 import io.legado.app.model.localBook.LocalBook
 import io.legado.app.model.jsSource.JsSourceConfig
+import io.legado.app.help.config.AppConfig
 import io.legado.app.help.storage.Restore
 import io.legado.app.help.storage.selectedBackupFileNames
 import io.legado.app.ui.main.bookshelf.importBookshelfJson
@@ -138,6 +139,15 @@ class FileAssociationViewModel(application: Application, private val savedState:
     }
 
     private suspend fun dispatchFile(fileDoc: FileDoc, shared: Boolean = false) {
+        // ACTION_VIEW on a book already inside the configured library must not stage
+        // and copy it back into the same directory (which creates a "(1)" duplicate).
+        if (!shared && fileDoc.name.matches(bookFileRegex)) {
+            val bookDirectory = AppConfig.defaultBookTreeUri?.let(Uri::parse)
+            if (bookDirectory != null && isSameLocalBookFile(fileDoc, bookDirectory)) {
+                openBookLiveData.postValue(LocalBook.importFile(fileDoc.uri))
+                return
+            }
+        }
         if (fileDoc.name.matches(AppPattern.archiveFileRegex)) {
             val backupNames = selectedBackupFileNames { true }.toSet()
             val entries = if (fileDoc.name.endsWith(".zip", true)) {
