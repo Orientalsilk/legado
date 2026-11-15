@@ -41,6 +41,7 @@ jobs:
             --tests 'io.legado.app.ui.book.read.ReadAloudPageHighlightTest' \
             --tests 'io.legado.app.ui.association.SharedImportAssociationTest' \
             --tests 'io.legado.app.ui.font.FontImportTest' \
+            --tests 'io.legado.app.model.webBook.BookChapterUrlChangeTest' \
             --build-cache --warning-mode all
 
       - name: Build debug APK
