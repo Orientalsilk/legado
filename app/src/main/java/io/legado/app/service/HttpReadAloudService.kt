@@ -529,6 +529,9 @@ class HttpReadAloudService : BaseReadAloudService(),
                 ensureSessionActive(sessionId)
                 val httpTts = ReadAloud.httpTTS ?: throw NoStackTraceException("tts is null")
                 val roleTagState = RoleTagState()
+                contentList.take(nowSpeak).forEach { prior ->
+                    if (AppConfig.ttsRoleTag) SpeechRoleTagger.tag(prior, roleTagState)
+                }
                 contentList.forEachIndexed { index, content ->
                     ensureActive()
                     ensureSessionActive(sessionId)
@@ -539,16 +542,16 @@ class HttpReadAloudService : BaseReadAloudService(),
                     }
                     val fileName = md5SpeakFileName(text)
                     val speakText = text.replace(AppPattern.notReadAloudRegex, "")
+                    val roleTaggedText = if (AppConfig.ttsRoleTag && speakText.isNotEmpty()) {
+                        SpeechRoleTagger.tag(speakText, roleTagState).text
+                    } else {
+                        speakText
+                    }
                     if (speakText.isEmpty()) {
                         AppLog.put("阅读段落内容为空，使用无声音频代替。\n朗读文本：$text")
                         createSilentSound(fileName)
                     } else if (!hasSpeakFile(fileName)) {
                         runCatching {
-                            val roleTaggedText = if (AppConfig.ttsRoleTag) {
-                                SpeechRoleTagger.tag(speakText, roleTagState).text
-                            } else {
-                                speakText
-                            }
                             val inputStream = getSpeakStream(
                                 httpTts, speakText, sessionId, roleTaggedText = roleTaggedText,
                             )
@@ -598,15 +601,23 @@ class HttpReadAloudService : BaseReadAloudService(),
             .filter { it.isNotEmpty() }
             .take(NEXT_CHAPTER_TTS_PREFETCH_ITEM_LIMIT)
             .toList()
+        val roleTagState = RoleTagState()
         contentList.forEach { content ->
             currentCoroutineContext().ensureActive()
             val fileName = md5SpeakFileName(content, textChapter)
             val speakText = content.replace(AppPattern.notReadAloudRegex, "")
+            val roleTaggedText = if (AppConfig.ttsRoleTag && speakText.isNotEmpty()) {
+                SpeechRoleTagger.tag(speakText, roleTagState).text
+            } else {
+                speakText
+            }
             if (speakText.isEmpty()) {
                 createSilentSound(fileName)
             } else if (!hasSpeakFile(fileName)) {
                 runCatching {
-                    val inputStream = getSpeakStream(httpTts, speakText, sessionId)
+                    val inputStream = getSpeakStream(
+                        httpTts, speakText, sessionId, roleTaggedText = roleTaggedText,
+                    )
                     if (inputStream != null) {
                         createSpeakFile(fileName, inputStream)
                     } else {
@@ -626,6 +637,11 @@ class HttpReadAloudService : BaseReadAloudService(),
                 ensureSessionActive(sessionId)
                 val httpTts = ReadAloud.httpTTS ?: throw NoStackTraceException("tts is null")
                 val roleTagState = RoleTagState()
+                contentList.take(nowSpeak).forEach { prior ->
+                    if (AppConfig.ttsRoleTag) {
+                        SpeechRoleTagger.tag(prior.replace(AppPattern.notReadAloudRegex, ""), roleTagState)
+                    }
+                }
                 val downloaderChannel = Channel<Downloader>()
                 launch {
                     for (downloader in downloaderChannel) {
@@ -712,7 +728,14 @@ class HttpReadAloudService : BaseReadAloudService(),
             currentCoroutineContext().ensureActive()
             val fileName = md5SpeakFileName(content, textChapter)
             val speakText = content.replace(AppPattern.notReadAloudRegex, "")
-            val dataSourceFactory = createDataSourceFactory(httpTts, speakText, sessionId)
+            val roleTaggedText = if (AppConfig.ttsRoleTag && speakText.isNotEmpty()) {
+                SpeechRoleTagger.tag(speakText, roleTagState).text
+            } else {
+                speakText
+            }
+            val dataSourceFactory = createDataSourceFactory(
+                httpTts, speakText, sessionId, roleTaggedText,
+            )
             val downloader = createDownloader(dataSourceFactory, fileName)
             downloaderChannel.send(downloader)
         }
