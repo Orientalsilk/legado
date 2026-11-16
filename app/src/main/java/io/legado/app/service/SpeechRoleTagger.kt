@@ -102,6 +102,7 @@ internal object SpeechRoleTagger {
     )
 
     private val femaleSet = femaleWords.toSet()
+    private val maleSet = maleWords.toSet()
 
     /** 这些称呼落在“少年”或“老年”声音上，和 MultiTTS 的角色规则保持一致。 */
     private val youthWords = setOf("少年", "男孩", "儿子", "少女", "女孩", "丫头", "女儿", "公主")
@@ -113,20 +114,118 @@ internal object SpeechRoleTagger {
     private class Matcher(
         val regex: Regex,
         val maleLeads: Set<String>,
-        val femaleLeads: Set<String>
+        val femaleLeads: Set<String>,
+        val learnedMale: Set<String>,
+        val learnedFemale: Set<String>
     )
 
-    private val baseMatcher = buildMatcher(emptyList(), emptyList())
+    private val baseMatcher = buildMatcher(emptyList(), emptyList(), emptySet(), emptySet())
 
     private var cachedRaw: String = ""
+
+    // ---- 自动学习人名性别：整章先扫一遍，“李定国……他”这类写法记为男，“女兵……她”记为女 ----
+    @Volatile
+    private var learnedMale: Set<String> = emptySet()
+
+    @Volatile
+    private var learnedFemale: Set<String> = emptySet()
+
+    @Volatile
+    private var learnedVersion: Int = 0
+    private var learnedBookKey: String = ""
+    private var learnedFromList: List<String>? = null
+
+    private val nameContext = Regex(
+        "(?<![一-龥])([一-龥]{2,3})(?:又|也|却|便|就|还|都|更|不|好像|仿佛|似乎|重重|轻轻|缓缓|淡淡|冷冷|低声)?" +
+            "(?:觉得|感觉|说道|说|问道|问|答道|答|笑道|叹道|怒道|喝道|喊道|道|摇头|点头|皱眉|苦笑|冷笑|微笑|笑|惊讶|好奇|想|" +
+            "笑了笑|转身|站起|低下头|抬起头|看着|望着|盯着|沉默|愣住|叹了口气)"
+    )
+    private const val badNameStart = "的了是在也都就还又却但只于而且并这那有被把将对向跟给和与及或如若虽既因所其他她它我你您咱"
+    private val pronounRegex = Regex("[他她]")
+
+    @Synchronized
+    fun resetLearnedNames() {
+        learnedMale = emptySet()
+        learnedFemale = emptySet()
+        learnedBookKey = ""
+        learnedFromList = null
+        learnedVersion++
+    }
+
+    /**
+     * 扫描整章文字，学习“人名 → 性别”。只在人名后面的同一句里出现“他/她”时才记一票，
+     * 票数不少于 2 且同一性别占 80% 以上才采用，避免把错的词当成人名。
+     */
+    @Synchronized
+    fun learnFromChapter(bookKey: String, paragraphs: List<String>) {
+        if (paragraphs === learnedFromList) return
+        learnedFromList = paragraphs
+        if (bookKey != learnedBookKey) {
+            learnedBookKey = bookKey
+            learnedMale = emptySet()
+            learnedFemale = emptySet()
+        }
+        val votes = HashMap<String, IntArray>()
+        for (paragraph in paragraphs) {
+            for (m in nameContext.findAll(paragraph)) {
+                val name = m.groupValues[1]
+                if (badNameStart.indexOf(name[0]) >= 0) continue
+                if (name.contains('他') || name.contains('她')) continue
+                if (name in femaleSet || name in maleSet) continue
+                val windowStart = m.range.last + 1
+                var windowEnd = minOf(paragraph.length, windowStart + 30)
+                for (k in windowStart until windowEnd) {
+                    if ("。！？“”\n".indexOf(paragraph[k]) >= 0) {
+                        windowEnd = k
+                        break
+                    }
+                }
+                val window = paragraph.substring(windowStart, windowEnd)
+                for (p in pronounRegex.findAll(window)) {
+                    val s = p.range.first
+                    val before: Char? = if (s > 0) window[s - 1] else null
+                    val after: Char? = if (s + 1 < window.length) window[s + 1] else null
+                    if (after == '的' || (after != null && "们人乡处方".indexOf(after) >= 0)) continue
+                    if (before != null && (objectMarkers.indexOf(before) >= 0 ||
+                            "其别排利吉".indexOf(before) >= 0)
+                    ) continue
+                    val v = votes.getOrPut(name) { IntArray(2) }
+                    if (p.value == "他") v[0]++ else v[1]++
+                    break
+                }
+            }
+        }
+        val male = HashSet(learnedMale)
+        val female = HashSet(learnedFemale)
+        for ((name, v) in votes) {
+            val total = v[0] + v[1]
+            if (total < 2) continue
+            if (v[0] * 5 >= total * 4) {
+                if (name !in female) male.add(name)
+            } else if (v[1] * 5 >= total * 4) {
+                if (name !in male) female.add(name)
+            }
+        }
+        if (male != learnedMale || female != learnedFemale) {
+            learnedMale = male
+            learnedFemale = female
+            learnedVersion++
+        }
+    }
     private var cachedMatcher: Matcher = baseMatcher
 
-    private fun buildMatcher(maleLeads: List<String>, femaleLeads: List<String>): Matcher {
-        val words = (femaleWords + maleWords + maleLeads + femaleLeads).distinct()
+    private fun buildMatcher(
+        maleLeads: List<String>,
+        femaleLeads: List<String>,
+        learnedMale: Set<String>,
+        learnedFemale: Set<String>
+    ): Matcher {
+        val words = (femaleWords + maleWords + maleLeads + femaleLeads +
+            learnedMale + learnedFemale).distinct()
         val regex = Regex(
             words.sortedByDescending { it.length }.joinToString("|") { Regex.escape(it) }
         )
-        return Matcher(regex, maleLeads.toSet(), femaleLeads.toSet())
+        return Matcher(regex, maleLeads.toSet(), femaleLeads.toSet(), learnedMale, learnedFemale)
     }
 
     private fun parseNames(line: String): List<String> =
@@ -135,16 +234,19 @@ internal object SpeechRoleTagger {
     @Synchronized
     private fun currentMatcher(): Matcher {
         val raw = runCatching { leadNamesProvider() }.getOrDefault("")
-        if (raw == cachedRaw) return cachedMatcher
+        val key = raw + "#" + learnedVersion
+        if (key == cachedRaw) return cachedMatcher
         val lines = raw.lines()
         val male = parseNames(lines.getOrElse(0) { "" })
         val female = parseNames(lines.getOrElse(1) { "" })
-        cachedMatcher = if (male.isEmpty() && female.isEmpty()) {
+        cachedMatcher = if (male.isEmpty() && female.isEmpty() &&
+            learnedMale.isEmpty() && learnedFemale.isEmpty()
+        ) {
             baseMatcher
         } else {
-            buildMatcher(male, female)
+            buildMatcher(male, female, learnedMale, learnedFemale)
         }
-        cachedRaw = raw
+        cachedRaw = key
         return cachedMatcher
     }
 
@@ -208,6 +310,8 @@ internal object SpeechRoleTagger {
             val speaker = when (word) {
                 in matcher.maleLeads -> Speaker(SpeakerGender.MALE, SpeakerAge.LEAD)
                 in matcher.femaleLeads -> Speaker(SpeakerGender.FEMALE, SpeakerAge.LEAD)
+                in matcher.learnedMale -> Speaker(SpeakerGender.MALE)
+                in matcher.learnedFemale -> Speaker(SpeakerGender.FEMALE)
                 else -> {
                     val gender = if (word in femaleSet) SpeakerGender.FEMALE else SpeakerGender.MALE
                     val age = when (word) {

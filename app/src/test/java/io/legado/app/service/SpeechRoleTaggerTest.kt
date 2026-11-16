@@ -89,6 +89,38 @@ class SpeechRoleTaggerTest {
     }
 
     @Test
+    fun namesAreLearnedFromTheWholeChapterBeforeReading() {
+        SpeechRoleTagger.resetLearnedNames()
+        try {
+            val chapter = listOf(
+                "李定国觉得妹妹今晚太奇怪了，他好像能感觉道妹妹内心的痛苦。",
+                "“我的信？”李定国又惊讶了，他没有什么朋友。",
+                "“没。”李定国摇头：“听都没听说过。”"
+            )
+            SpeechRoleTagger.learnFromChapter("book", chapter)
+            val out = SpeechRoleTagger.tag(chapter[2], RoleTagState()).text
+            assertEquals(
+                "${SpeechRoleTagger.MALE_TAG}“没。”李定国摇头：${SpeechRoleTagger.MALE_TAG}“听都没听说过。”",
+                out
+            )
+        } finally {
+            SpeechRoleTagger.resetLearnedNames()
+        }
+    }
+
+    @Test
+    fun aNameWithOnlyOneVoteIsNotLearned() {
+        SpeechRoleTagger.resetLearnedNames()
+        try {
+            SpeechRoleTagger.learnFromChapter("book", listOf("张三说道，她点了点头。"))
+            val out = SpeechRoleTagger.tag("“好。”张三摇头：“不行。”", RoleTagState()).text
+            assertEquals("“好。”张三摇头：“不行。”", out)
+        } finally {
+            SpeechRoleTagger.resetLearnedNames()
+        }
+    }
+
+    @Test
     fun narrationWithoutDialogueIsUntouched() {
         val text = "他走进屋里，她抬头看了一眼。"
         val tagged = SpeechRoleTagger.tag(text, RoleTagState())

@@ -668,6 +668,10 @@ abstract class BaseReadAloudService : BaseService(),
         }
         isRun = true
         pause = false
+        if (AppConfig.ttsRoleTag) {
+            val bookKey = ReadBook.book?.bookUrl.orEmpty()
+            runCatching { SpeechRoleTagger.learnFromChapter(bookKey, contentList) }
+        }
         needResumeOnAudioFocusGain = false
         needResumeOnCallStateIdle = false
         upReadAloudNotification()
